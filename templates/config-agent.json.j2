@@ -1,0 +1,14 @@
+{
+  "server": false,
+  "datacenter": "dc1",
+  "node_name": "{{ ansible_hostname }}",
+  "data_dir": "/var/lib/consul",
+  "bind_addr": "{{ ansible_default_ipv4.address }}",
+  "client_addr": "127.0.0.1",
+  "retry_join": [{%for host in groups['consul']%}
+        "{{hostvars[host]['ansible_default_ipv4']['address']}}"{%if not loop.last%},
+        {%endif%}{%endfor%}],
+  "encrypt": "{{ hostvars['consul']['consul_token'] }}",
+  "log_level": "warn",
+  "enable_syslog": true
+}

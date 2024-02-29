@@ -12,12 +12,12 @@
         dest: /tmp/consul_1.18.0_linux_amd64.zip
         mode: '0666'
 
-    - name: unzip
+    - name: Unzip
       become: true
       shell: "unzip /tmp/consul_1.18.0_linux_amd64.zip -d /usr/bin/"
       ignore_errors: true
 
-    - name: user consul
+    - name: User consul
       ansible.builtin.user:
         name: consul
         comment: for consul
@@ -38,36 +38,57 @@
         state: directory
         mode: '0755'
 
-    - name: consul key
+    - name: Consul key
       ansible.builtin.shell:
         cmd: consul keygen
       register: consul_token
-      run_once: true
-    
-    - name: check
-      debug:
-        msg: "{{ consul_token.stdout }}"
+      when: "'master1' in ansible_hostname"
 
-    - name: "Add consul_token"
+    # - name: check
+    #   debug:
+    #     msg: "{{ consul_token.stdout }}"
+
+    - name: write elastic to file for kibana web-logging
+      ansible.builtin.copy:
+        content: "{{ consul_token.stdout }}"
+        dest: "/tmp/consul.txt"
+      when: "'master1' in ansible_hostname"
+
+    - name: Copy pass elastic to master-ansible
+      ansible.builtin.fetch:
+        src:  /tmp/consul.txt
+        dest: "{{ local_dir }}/consul.txt"
+        flat: true
+      when: "'master1' in ansible_hostname"
+
+    - name: get content of remote file
+      set_fact:
+        readme_contents: "{{ lookup('file', '/Users/joos/Desktop/very_secure_dir/consul.txt') }}"
+      register: remote_content_encoded
+
+    # - debug:
+    #     msg: "{{ remote_content_encoded.ansible_facts.readme_contents }}"
+
+    - name: Add consul_token
       add_host:
-        name:   "consul"
-        consul_token:  "{{ consul_token.stdout }}"
+        name: "consul"
+        consul_token:  "{{ remote_content_encoded.ansible_facts.readme_contents }}"
 
-    - name: Copy config
+    - name: Copy server config
       become: true
       ansible.builtin.template:
         src: config-server.json.j2
         mode: "0644"
         dest: "/etc/consul.d/config.json"
-      when: regex_search("^master(.*)$")
+      when: "'master' in ansible_hostname"
 
-    - name: Copy config
+    - name: Copy agent config
       become: true
       ansible.builtin.template:
         src: config-agent.json.j2
         mode: "0644"
         dest: "/etc/consul.d/config.json"
-      when: regex_search("^agent(.*)$")
+      when: "'agent' in ansible_hostname"
 
     - name: Copy service
       become: true
