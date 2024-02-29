@@ -1,0 +1,24 @@
+{
+     "bind_addr": "0.0.0.0",
+     "bootstrap_expect": 3,
+     "client_addr": "0.0.0.0",
+     "datacenter": "dc1",
+     "node_name": "{{ ansible_hostname }}",
+     "data_dir": "/var/lib/consul",
+     "domain": "consul",
+     "enable_local_script_checks": true,
+     "dns_config": {
+         "enable_truncate": true,
+         "only_passing": true
+     },
+     "enable_syslog": true,
+     "encrypt": "{{ hostvars['consul']['consul_token'] }}",
+     "leave_on_terminate": true,
+     "log_level": "INFO",
+     "rejoin_after_leave": true,
+     "server": true,
+     "start_join": [{%for host in groups['consul']%}
+        "{{hostvars[host]['ansible_default_ipv4']['address']}}"{%if not loop.last%},
+        {%endif%}{%endfor%}],
+     "ui_config": { "enabled": true }
+}

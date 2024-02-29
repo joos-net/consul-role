@@ -1,0 +1,6 @@
+---
+- name: install consul
+  hosts: consul
+  become: true
+  roles:
+  - consul
