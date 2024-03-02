@@ -107,6 +107,7 @@
         name: "consul"
         consul_token: "{{ remote_content_encoded.ansible_facts.readme_contents }}"
 
+
 #################### Consul server config
 
     - name: Copy server config
@@ -163,6 +164,7 @@
       when: "'agent' in ansible_hostname"
 
 #################### Consul service
+
 
     - name: Copy service
       become: true
