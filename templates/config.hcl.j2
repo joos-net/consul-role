@@ -1,0 +1,24 @@
+consul {
+  address = "{{ groups['consul'][0] }}:8500"
+  retry {
+    enabled = true
+    attempts = 12
+    backoff = "250ms"
+    max_backoff = "10s"
+  }
+}
+
+reload_signal = "SIGHUP"
+kill_signal = "SIGINT"
+max_stale = "10m"
+log_level = "warn"
+
+wait {
+  min = "2s"
+  max = "5s"
+}
+
+deduplicate {
+  enabled = true
+  prefix = "consul-template/dedup/"
+}

@@ -1,2 +1,3 @@
 ---
 # defaults file for consul
+local_dir: ~/Desktop/very_secure_dir
