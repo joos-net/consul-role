@@ -1,0 +1,25 @@
+---
+# tasks file for nginx-role
+  - name: Update apt cache and install Nginx
+    ansible.builtin.apt:
+      name: nginx
+      state: latest
+      update_cache: true
+    when: "'agent' in ansible_hostname"
+
+  - name: Copy nginx index
+    become: true
+    ansible.builtin.template:
+      src: index.nginx-debian.html.j2
+      mode: "0644"
+      dest: "/var/www/html/index.nginx-debian.html"
+    when: "'agent' in ansible_hostname"
+    notify: Restart nginx
+
+  - name: Delete default
+    become: true
+    ansible.builtin.file:
+      path: /etc/nginx/sites-enabled/default
+      state: absent
+    when: "'agent1' in ansible_hostname"
+    notify: Restart nginx

@@ -1,6 +1,7 @@
 ---
-- name: install consul
+- name: Install consul and nginx for test
   hosts: consul
   become: true
   roles:
-  - consul
+    - consul-role
+    - nginx-role

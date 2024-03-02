@@ -1,8 +1,8 @@
 ---
-# tasks file for consul
+#################### install Consul
     - name: apt install unzip
       become: true
-      apt: 
+      ansible.builtin.apt:
         name: unzip
         state: present
 
@@ -12,12 +12,12 @@
         dest: /tmp/consul_1.18.0_linux_amd64.zip
         mode: '0666'
 
-    - name: unzip
+    - name: Unzip
       become: true
       shell: "unzip /tmp/consul_1.18.0_linux_amd64.zip -d /usr/bin/"
       ignore_errors: true
 
-    - name: user consul
+    - name: User consul
       ansible.builtin.user:
         name: consul
         comment: for consul
@@ -38,49 +38,172 @@
         state: directory
         mode: '0755'
 
-    - name: consul key
+    - name: Chmod nginx/conf.d
+      ansible.builtin.file:
+        owner: consul
+        group: consul
+        path: /etc/nginx/conf.d
+        state: directory
+        mode: '0755'
+
+#################### install Consul-template
+    - name: download 2
+      ansible.builtin.get_url:
+        url: "https://hashicorp-releases.yandexcloud.net/consul-template/0.37.0/consul-template_0.37.0_linux_amd64.zip"
+        dest: /tmp/consul-template_0.37.0_linux_amd64.zip
+        mode: '0666'
+      when: "'agent1' in ansible_hostname"
+
+    - name: Unzip 2
+      become: true
+      shell: "unzip /tmp/consul-template_0.37.0_linux_amd64.zip -d /usr/bin/"
+      ignore_errors: true
+      when: "'agent1' in ansible_hostname"
+
+
+    - name: Create /var/lib/consul/templates
+      ansible.builtin.file:
+        path: /var/lib/consul/templates
+        owner: consul
+        group: consul
+        state: directory
+        mode: '0755'
+
+    - name: Create /etc/consul-template.d
+      ansible.builtin.file:
+        owner: consul
+        group: consul
+        path: /etc/consul-template.d
+        state: directory
+        mode: '0755'
+
+#################### Create token for cluster
+    - name: Consul token
       ansible.builtin.shell:
         cmd: consul keygen
       register: consul_token
-      run_once: true
-    
-    - name: check
-      debug:
-        msg: "{{ consul_token.stdout }}"
+      when: "'master1' in ansible_hostname"
 
-    - name: "Add consul_token"
-      add_host:
-        name:   "consul"
-        consul_token:  "{{ consul_token.stdout }}"
+    - name: Write consul_token
+      ansible.builtin.copy:
+        content: "{{ consul_token.stdout }}"
+        dest: "/tmp/consul.txt"
+      when: "'master1' in ansible_hostname"
 
-    - name: Copy config
+    - name: Copy consul_token
+      ansible.builtin.fetch:
+        src:  /tmp/consul.txt
+        dest: "{{ local_dir }}/consul.txt"
+        flat: true
+      when: "'master1' in ansible_hostname"
+
+    - name: Get content of remote file
+      ansible.builtin.set_fact:
+        readme_contents: "{{ lookup('file', '/Users/joos/Desktop/very_secure_dir/consul.txt') }}"
+      register: remote_content_encoded
+
+    - name: Add consul_token
+      ansible.builtin.add_host:
+        name: "consul"
+        consul_token: "{{ remote_content_encoded.ansible_facts.readme_contents }}"
+
+
+#################### Consul server config
+
+    - name: Copy server config
       become: true
       ansible.builtin.template:
         src: config-server.json.j2
         mode: "0644"
         dest: "/etc/consul.d/config.json"
-      when: regex_search("^master(.*)$")
+      when: "'master' in ansible_hostname"
 
-    - name: Copy config
+#################### Consul agent config
+
+    - name: Copy agent config
       become: true
       ansible.builtin.template:
         src: config-agent.json.j2
         mode: "0644"
         dest: "/etc/consul.d/config.json"
-      when: regex_search("^agent(.*)$")
+      when: "'agent' in ansible_hostname"
+
+#################### Consul template config
+
+    - name: Copy template config
+      become: true
+      ansible.builtin.template:
+        src: config.hcl.j2
+        mode: "0644"
+        dest: "/etc/consul-template.d/config.hcl"
+      when: "'agent1' in ansible_hostname"
+
+    - name: Copy consule template for nginx
+      become: true
+      ansible.builtin.copy:
+        src: templates.hcl
+        mode: "0644"
+        dest: "/etc/consul-template.d/templates.hcl"
+      when: "'agent1' in ansible_hostname"
+
+    - name: Copy nginx template
+      become: true
+      ansible.builtin.copy:
+        src: nginx.ctmpl
+        mode: "0644"
+        dest: "/var/lib/consul/templates/nginx.ctmpl"
+      when: "'agent1' in ansible_hostname"
+
+#################### Consul nginx service
+    - name: Copy nginx service
+      become: true
+      ansible.builtin.template:
+        src: web-service.json
+        mode: "0644"
+        dest: "/etc/consul.d/web-service.json"
+      when: "'agent' in ansible_hostname"
+
+#################### Consul service
+
 
     - name: Copy service
       become: true
       ansible.builtin.copy:
         src: consul.service
+        mode: "0644"
         dest: "/etc/systemd/system/consul.service"
+
+
+#################### Consul template service
+
+    - name: Copy template service
+      become: true
+      ansible.builtin.copy:
+        src: consul-template.service
+        mode: "0644"
+        dest: "/etc/systemd/system/consul-template.service"
+
+#################### Start services
 
     - name: Just force systemd to reread configs
       ansible.builtin.systemd_service:
         daemon_reload: true
 
-    - name: Enable nginx service
+    - name: Enable consule service
       ansible.builtin.systemd_service:
         name: consul.service
         enabled: true
         state: started
+
+    - name: Enable template service
+      ansible.builtin.systemd_service:
+        name: consul-template.service
+        enabled: true
+        state: started
+
+    - name: Restart nginx
+      become: true
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+      when: "'agent1' in ansible_hostname"

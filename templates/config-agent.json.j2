@@ -10,5 +10,8 @@
         {%endif%}{%endfor%}],
   "encrypt": "{{ hostvars['consul']['consul_token'] }}",
   "log_level": "warn",
-  "enable_syslog": true
+  "enable_syslog": true,
+  "enable_local_script_checks": true,
+  "enable_script_checks": true
+
 }
